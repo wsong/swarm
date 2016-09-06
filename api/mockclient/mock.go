@@ -259,7 +259,7 @@ func (client *MockClient) ImageImport(ctx context.Context, source types.ImageImp
 
 // ImageInspectWithRaw returns the image information and it's raw representation
 func (client *MockClient) ImageInspectWithRaw(ctx context.Context, image string) (types.ImageInspect, []byte, error) {
-	args := client.Mock.Called(ctx, image, getSize)
+	args := client.Mock.Called(ctx, image)
 	return args.Get(0).(types.ImageInspect), args.Get(1).([]byte), args.Error(2)
 }
 

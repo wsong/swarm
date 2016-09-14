@@ -977,8 +977,6 @@ func proxyNetworkDisconnect(c *context, w http.ResponseWriter, r *http.Request) 
 		httpError(w, fmt.Sprintf("No such network: %s", networkid), http.StatusNotFound)
 		return
 	}
-	// Set the network ID in the proxied URL path.
-	r.URL.Path = strings.Replace(r.URL.Path, networkid, network.ID, 1)
 
 	// make a copy of r.Body
 	buf, _ := ioutil.ReadAll(r.Body)
@@ -994,23 +992,12 @@ func proxyNetworkDisconnect(c *context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var engine *cluster.Engine
-
-	if disconnect.Force && network.Scope == "global" {
-		randomEngine, err := c.cluster.RANDOMENGINE()
-		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		engine = randomEngine
-	} else {
-		container := c.cluster.Container(disconnect.Container)
-		if container == nil {
-			httpError(w, fmt.Sprintf("No such container: %s", disconnect.Container), http.StatusNotFound)
-			return
-		}
-		engine = container.Engine
+	container := c.cluster.Container(disconnect.Container)
+	if container == nil {
+		httpError(w, fmt.Sprintf("No such container: %s", disconnect.Container), http.StatusNotFound)
+		return
 	}
+	engine := container.Engine
 
 	cb := func(resp *http.Response) {
 		// force fresh networks on this engine

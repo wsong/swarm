@@ -367,6 +367,29 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// UCP-ONLY: if a node filter is set, trigger an engine refresh on that node.
+	// Otherwise, if a name filter is set for the "ucp-" prefix, trigger an engine refresh on all nodes
+	nodes := filters.Get("node")
+	if len(nodes) > 0 {
+		for _, node := range nodes {
+			err := c.cluster.RefreshEngine(node)
+			if err != nil {
+				log.Debugf("could not match node filter for %s: %s", node, err)
+			}
+		}
+	} else {
+		names := filters.Get("name")
+		for _, name := range names {
+			if name == "^ucp-" {
+				err := c.cluster.RefreshEngines()
+				if err != nil {
+					log.Debugf("ucp filter detected but unable to refresh all engines: %s", err)
+				}
+				break
+			}
+		}
+	}
+
 	// Filtering: select the containers we want to return.
 	candidates := []*cluster.Container{}
 	for _, container := range c.cluster.Containers() {

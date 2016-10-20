@@ -1397,3 +1397,14 @@ func (e *Engine) TagImage(IDOrName string, ref string, force bool) error {
 	// refresh image
 	return e.RefreshImages()
 }
+
+func (e *Engine) RefreshEngine(hostname string) error {
+	if hostname != e.Name {
+		return fmt.Errorf("invalid engine name during refresh: %s vs %s", hostname, e.Name)
+	}
+	return e.RefreshContainers(true)
+}
+
+func (e *Engine) RefreshEngines() error {
+	return e.RefreshEngine(e.Name)
+}

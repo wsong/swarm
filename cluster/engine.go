@@ -586,6 +586,15 @@ func (e *Engine) RemoveImage(name string, force bool) ([]types.ImageDelete, erro
 func (e *Engine) RemoveNetwork(network *Network) error {
 	err := e.apiClient.NetworkRemove(context.Background(), network.ID)
 	e.CheckConnectionErr(err)
+	// swarm-scoped overlay networks can sometimes stick around after
+	// being deleted (see https://github.com/docker/docker/issues/27639).
+	// Thus, we simply delete them twice.
+	if err == nil && network.Scope == "swarm" && network.Driver == "overlay" {
+		err = e.apiClient.NetworkRemove(context.Background(), network.ID)
+		if engineapi.IsErrNotFound(err) {
+			err = nil
+		}
+	}
 	if err != nil {
 		return err
 	}

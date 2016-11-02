@@ -591,7 +591,7 @@ func (e *Engine) RemoveNetwork(network *Network) error {
 	// Thus, we simply delete them twice.
 	if err == nil && network.Scope == "swarm" && network.Driver == "overlay" {
 		err = e.apiClient.NetworkRemove(context.Background(), network.ID)
-		if engineapi.IsErrNotFound(err) {
+		if engineapi.IsErrNotFound(err) || strings.Contains(err.Error(), "not found") {
 			err = nil
 		}
 	}

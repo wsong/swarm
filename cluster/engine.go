@@ -194,7 +194,7 @@ func (e *Engine) Connect(config *tls.Config) error {
 	c := dockerclient.NewDockerClientFromHTTP(url, httpClient, config)
 
 	// Use HTTP Client used by dockerclient to create engine-api client
-	apiClient, err := engineapi.NewClient("tcp://"+e.Addr, "", c.HTTPClient, nil)
+	apiClient, err := engineapi.NewClient("tcp://"+e.Addr, "1.24", c.HTTPClient, nil)
 	if err != nil {
 		return err
 	}

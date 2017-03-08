@@ -1,15 +1,14 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"runtime/debug"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/docker/swarm/experimental"
 	"github.com/docker/swarm/version"
+	"github.com/urfave/cli"
 )
 
 // Run the Swarm CLI.
@@ -34,7 +33,7 @@ func Run() {
 		cli.StringFlag{
 			Name:  "log-level, l",
 			Value: "info",
-			Usage: fmt.Sprintf("Log level (options: debug, info, warn, error, fatal, panic)"),
+			Usage: "Log level (options: debug, info, warn, error, fatal, panic)",
 		},
 
 		cli.BoolFlag{
@@ -48,7 +47,7 @@ func Run() {
 		log.SetOutput(os.Stdout)
 		level, err := log.ParseLevel(c.String("log-level"))
 		if err != nil {
-			log.Fatalf(err.Error())
+			log.Fatal(err.Error())
 		}
 		log.SetLevel(level)
 

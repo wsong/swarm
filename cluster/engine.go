@@ -495,13 +495,22 @@ func (e *Engine) updateSpecs() error {
 	// Swarm/docker identifies engine by ID. Updating ID but not updating cluster
 	// index will put the cluster into inconsistent state. If this happens, the
 	// engine should be put to pending state for re-validation.
+	var infoID string
+	if info.Swarm.NodeID != "" {
+		// Use the swarm-mode node ID if it's available, since it's
+		// guaranteed to be unique, even if the daemon has a copied
+		// /etc/docker/key.json file from another machine.
+		infoID = info.Swarm.NodeID
+	} else {
+		infoID = info.ID
+	}
 	if e.ID == "" {
-		e.ID = info.ID
-	} else if e.ID != info.ID {
+		e.ID = infoID
+	} else if e.ID != infoID {
 		e.state = statePending
-		message := fmt.Sprintf("Engine (ID: %s, Addr: %s) shows up with another ID:%s. Please remove it from cluster, it can be added back.", e.ID, e.Addr, info.ID)
+		message := fmt.Sprintf("Engine (ID: %s, Addr: %s) shows up with another ID:%s. Please remove it from cluster, it can be added back.", e.ID, e.Addr, infoID)
 		e.lastError = message
-		return fmt.Errorf(message)
+		return errors.New(message)
 	}
 
 	// delta is an estimation of time difference between manager and engine
@@ -516,7 +525,7 @@ func (e *Engine) updateSpecs() error {
 	}
 
 	// If the servers are sync up on time, this delta might be the source of error
-	// we set a threshhold that to ignore this case.
+	// we set a threshold that to ignore this case.
 	absDelta := delta
 	if delta.Seconds() < 0 {
 		absDelta = time.Duration(-1*delta.Seconds()) * time.Second
@@ -547,7 +556,7 @@ func (e *Engine) updateSpecs() error {
 		kv := strings.SplitN(label, "=", 2)
 		if len(kv) != 2 {
 			message := fmt.Sprintf("Engine (ID: %s, Addr: %s) contains an invalid label (%s) not formatted as \"key=value\".", e.ID, e.Addr, label)
-			return fmt.Errorf(message)
+			return errors.New(message)
 		}
 
 		// If an engine managed by Swarm contains a label with key "node",
@@ -571,7 +580,10 @@ func (e *Engine) updateSpecs() error {
 
 // RemoveImage deletes an image from the engine.
 func (e *Engine) RemoveImage(name string, force bool) ([]types.ImageDelete, error) {
-	rmOpts := types.ImageRemoveOptions{force, true}
+	rmOpts := types.ImageRemoveOptions{
+		Force:         force,
+		PruneChildren: true,
+	}
 	dels, err := e.apiClient.ImageRemove(context.Background(), name, rmOpts)
 	e.CheckConnectionErr(err)
 
@@ -678,7 +690,7 @@ func (e *Engine) refreshNetwork(ID string) error {
 
 // RefreshNetworks refreshes the list of networks on the engine.
 func (e *Engine) RefreshNetworks() error {
-	netLsOpts := types.NetworkListOptions{filters.NewArgs()}
+	netLsOpts := types.NetworkListOptions{Filters: filters.NewArgs()}
 	networks, err := e.apiClient.NetworkList(context.Background(), netLsOpts)
 	e.CheckConnectionErr(err)
 	if err != nil {
@@ -1374,7 +1386,7 @@ func (e *Engine) StartContainer(container *Container, hostConfig *dockerclient.H
 	// This is expected to occur in API versions 1.25 or higher if
 	// the HostConfig.AutoRemove field is set to true. This could also occur
 	// during race conditions where a third-party client removes the container
-	// immmediately after it's started.
+	// immediately after it's started.
 	if container.Info.HostConfig.AutoRemove && engineapi.IsErrContainerNotFound(err) {
 		delete(e.containers, container.ID)
 		log.Debugf("container %s was not detected shortly after ContainerStart, indicating a daemon-side removal", container.ID)

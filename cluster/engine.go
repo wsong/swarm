@@ -443,6 +443,19 @@ func (e *Engine) CheckConnectionErr(err error) {
 	// other errors may be ambiguous.
 }
 
+// EngineToContainerNode constructs types.ContainerNode from engine
+func (e *Engine) EngineToContainerNode() *types.ContainerNode {
+	return &types.ContainerNode{
+		ID:        e.ID,
+		IPAddress: e.IP,
+		Addr:      e.Addr,
+		Name:      e.Name,
+		Cpus:      int(e.Cpus),
+		Memory:    int64(e.Memory),
+		Labels:    e.Labels,
+	}
+}
+
 // Update API Version in apiClient
 func (e *Engine) updateClientVersionFromServer(serverVersion string) {
 	// v will be >= 1.8, since this is checked earlier
@@ -548,6 +561,9 @@ func (e *Engine) updateSpecs() error {
 	}
 	if info.OperatingSystem != "" {
 		e.Labels["operatingsystem"] = info.OperatingSystem
+	}
+	if info.OSType != "" {
+		e.Labels["ostype"] = info.OSType
 	}
 	for _, label := range info.Labels {
 		kv := strings.SplitN(label, "=", 2)
@@ -1416,6 +1432,28 @@ func (e *Engine) StartContainer(container *Container, hostConfig *dockerclient.H
 	return err
 }
 
+// InspectContainer inspects a container
+func (e *Engine) InspectContainer(id string) (*types.ContainerJSON, error) {
+	container, err := e.apiClient.ContainerInspect(context.Background(), id)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return nil, err
+	}
+
+	return &container, nil
+}
+
+// CreateContainerExec creates a container exec
+func (e *Engine) CreateContainerExec(id string, config types.ExecConfig) (types.IDResponse, error) {
+	execCreateResp, err := e.apiClient.ContainerExecCreate(context.Background(), id, config)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return types.IDResponse{}, err
+	}
+
+	return execCreateResp, nil
+}
+
 // RenameContainer renames a container
 func (e *Engine) RenameContainer(container *Container, newName string) error {
 	// send rename request
@@ -1431,13 +1469,32 @@ func (e *Engine) RenameContainer(container *Container, newName string) error {
 }
 
 // BuildImage builds an image
-func (e *Engine) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions) (io.ReadCloser, error) {
+func (e *Engine) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, callback func(msg JSONMessage)) error {
 	resp, err := e.apiClient.ImageBuild(context.Background(), buildContext, *buildImage)
 	e.CheckConnectionErr(err)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return resp.Body, nil
+	defer resp.Body.Close()
+
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during image build: %s - %s", line, err)
+			continue
+		}
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to build image: %s", msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
+	}
+	return nil
 }
 
 // TagImage tags an image

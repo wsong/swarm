@@ -405,10 +405,12 @@ func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan err
 			// if there's already an engine with the same ID.  If an engine
 			// changes address, we have to first remove it then add it back.
 			for _, entry := range removed {
+				log.Debugf("Discovery: remove engine %s", entry.String())
 				c.removeEngine(entry.String())
 			}
 
 			for _, entry := range added {
+				log.Debugf("Discovery: add engine %s", entry.String())
 				c.addEngine(entry.String())
 			}
 		case err := <-errCh:
@@ -624,7 +626,7 @@ func (c *Cluster) RemoveVolumes(name string) (bool, error) {
 }
 
 // Pull is exported.
-func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(where, status string, err error)) {
+func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(msg cluster.JSONMessageWrapper)) {
 	var wg sync.WaitGroup
 
 	for _, e := range c.listActiveEngines() {
@@ -634,21 +636,32 @@ func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(
 			defer wg.Done()
 
 			if callback != nil {
-				callback(engine.Name, "", nil)
+				callback(cluster.JSONMessageWrapper{
+					EngineName: engine.Name,
+				})
 			}
 
 			var engineCallback func(msg cluster.JSONMessage)
 			if callback != nil {
 				engineCallback = func(msg cluster.JSONMessage) {
-					callback(engine.Name, msg.Status, nil)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Msg:        msg,
+					})
 				}
 			}
 			err := engine.Pull(name, authConfig, engineCallback)
 			if callback != nil {
 				if err != nil {
-					callback(engine.Name, "", err)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Err:        err,
+					})
 				} else {
-					callback(engine.Name, "downloaded", nil)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Success:    true,
+					})
 				}
 			}
 		}(e)
@@ -658,7 +671,7 @@ func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(
 }
 
 // Load loads image.
-func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string, err error)) {
+func (c *Cluster) Load(imageReader io.Reader, callback func(msg cluster.JSONMessageWrapper)) {
 	var wg sync.WaitGroup
 
 	pipeWriters := []*io.PipeWriter{}
@@ -676,13 +689,19 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 			var engineCallback func(msg cluster.JSONMessage)
 			if callback != nil {
 				engineCallback = func(msg cluster.JSONMessage) {
-					callback(engine.Name, msg.Status, nil)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Msg:        msg,
+					})
 				}
 			}
 			err := engine.Load(reader, engineCallback)
 			if callback != nil {
 				if err != nil {
-					callback(engine.Name, "", err)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Err:        err,
+					})
 				}
 			}
 		}(pipeReader, e)
@@ -710,7 +729,7 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 }
 
 // Import imports image.
-func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
+func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(msg cluster.JSONMessageWrapper)) {
 	var wg sync.WaitGroup
 	pipeWriters := []*io.PipeWriter{}
 
@@ -728,15 +747,24 @@ func (c *Cluster) Import(source string, ref string, tag string, imageReader io.R
 			var engineCallback func(msg cluster.JSONMessage)
 			if callback != nil {
 				engineCallback = func(msg cluster.JSONMessage) {
-					callback(engine.Name, msg.Status, nil)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Msg:        msg,
+					})
 				}
 			}
 			err := engine.Import(source, ref, tag, reader, engineCallback)
 			if callback != nil {
 				if err != nil {
-					callback(engine.Name, "", err)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Err:        err,
+					})
 				} else {
-					callback(engine.Name, "Import success", nil)
+					callback(cluster.JSONMessageWrapper{
+						EngineName: engine.Name,
+						Success:    true,
+					})
 				}
 			}
 
@@ -982,7 +1010,7 @@ func (c *Cluster) RenameContainer(container *cluster.Container, newName string) 
 }
 
 // BuildImage builds an image
-func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, callback func(what, status string, err error)) error {
+func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, callback func(msg cluster.JSONMessageWrapper)) error {
 	c.scheduler.Lock()
 
 	// get an engine
@@ -1001,15 +1029,24 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 	var engineCallback func(msg cluster.JSONMessage)
 	if callback != nil {
 		engineCallback = func(msg cluster.JSONMessage) {
-			callback(engine.Name, msg.Status, nil)
+			callback(cluster.JSONMessageWrapper{
+				EngineName: engine.Name,
+				Msg:        msg,
+			})
 		}
 	}
 	err = engine.BuildImage(buildContext, buildImage, engineCallback)
 	if callback != nil {
 		if err != nil {
-			callback(engine.Name, "", err)
+			callback(cluster.JSONMessageWrapper{
+				EngineName: engine.Name,
+				Err:        err,
+			})
 		} else {
-			callback(engine.Name, "built", nil)
+			callback(cluster.JSONMessageWrapper{
+				EngineName: engine.Name,
+				Success:    true,
+			})
 		}
 	}
 

@@ -24,6 +24,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
+	"github.com/docker/swarmkit/watch"
 	"github.com/samalba/dockerclient"
 )
 
@@ -59,6 +60,7 @@ type Cluster struct {
 	sync.RWMutex
 
 	eventHandlers     *cluster.EventHandlers
+	watchQueue        *watch.Queue
 	engines           map[string]*cluster.Engine
 	pendingEngines    map[string]*cluster.Engine
 	scheduler         *scheduler.Scheduler
@@ -115,18 +117,31 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 
 // Handle callbacks for the events.
 func (c *Cluster) Handle(e *cluster.Event) error {
+	// publish event to the watchQueue for external subscribers
+	c.watchQueue.Publish(e)
+	// call Handle for other eventHandlers
 	c.eventHandlers.Handle(e)
 	return nil
 }
 
 // RegisterEventHandler registers an event handler.
-func (c *Cluster) RegisterEventHandler(h cluster.EventHandler) error {
+func (c *Cluster) RegisterEventHandler(h cluster.EventHandler, q *watch.Queue) error {
+	// only set if watchQueue hasn't been set already. This is to avoid issues because
+	// the watchdog code still uses the old event handler.
+	if q != nil && c.watchQueue == nil {
+		c.watchQueue = q
+	}
 	return c.eventHandlers.RegisterEventHandler(h)
 }
 
 // UnregisterEventHandler unregisters a previously registered event handler.
 func (c *Cluster) UnregisterEventHandler(h cluster.EventHandler) {
 	c.eventHandlers.UnregisterEventHandler(h)
+}
+
+// CloseWatchQueue closes the watchQueue when the manager shuts down.
+func (c *Cluster) CloseWatchQueue() {
+	c.watchQueue.Close()
 }
 
 // generateUniqueID generates a globally (across the cluster) unique ID.
@@ -310,6 +325,13 @@ func (c *Cluster) addEngine(addr string) bool {
 	}
 
 	engine := cluster.NewEngine(addr, c.overcommitRatio, c.engineOpts)
+	// This passes c, which has a Handle(Event) (error) function defined, which acts as the handler
+	// for events. This is the cluster level handler that is called by individual engines when they
+	// receive/emit events. This Handler in turn calls the eventHandlers.Handle() function.
+	// eventHandlers is a map from EventHandler -> struct{}, and eventHandlers.Handle() simply calls
+	// the Handle function for each of the EventHander objects in the map. Remember that EventHandler
+	// is an interface, that is implemented by both the Cluster object, as well as the eventsHandler
+	// object in api/events.go
 	if err := engine.RegisterEventHandler(c); err != nil {
 		log.Error(err)
 	}

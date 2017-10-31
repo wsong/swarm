@@ -154,7 +154,7 @@ func getCandidateAndFollower(discovery discovery.Backend, addr string, leaderTTL
 
 func setupReplication(c *cli.Context, cluster cluster.Cluster, server *api.Server, candidate *leadership.Candidate, follower *leadership.Follower, addr string, tlsConfig *tls.Config) {
 	primary := api.NewPrimary(cluster, tlsConfig, &statusHandler{cluster, candidate, follower, addr}, c.GlobalBool("debug"), c.Bool("cors"))
-	replica := api.NewReplica(primary, tlsConfig)
+	replica := api.NewReplica(primary, tlsConfig, addr)
 
 	go func() {
 		for {
@@ -188,10 +188,6 @@ func run(cl cluster.Cluster, candidate *leadership.Candidate, follower *leadersh
 		case leader := <-leaderCh:
 			if leader == "" {
 				continue
-			}
-			if leader == addr {
-				replica.SetPrimary("")
-				server.SetHandler(primary)
 			} else {
 				log.Infof("New leader elected: %s", leader)
 				replica.SetPrimary(leader)

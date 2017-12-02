@@ -24,6 +24,10 @@ export TAG
 
 build: dockereng/ucp-swarm$(ARCH_IMG)
 
+push:
+	@echo Pushing image image $@:$(TAG)
+	docker push dockereng/ucp-swarm$(ARCH_IMG):$(TAG)
+
 dockereng/ucp-swarm$(ARCH_IMG):
 	@echo Building image $@:$(TAG)
 	docker build --build-arg GOLANG_ALPINE=$(GOLANG_ALPINE) --build-arg ALPINE=$(ALPINE) -t dockereng/ucp-swarm$(ARCH_IMG):$(TAG) .

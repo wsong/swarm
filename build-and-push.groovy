@@ -35,7 +35,7 @@ parallel(
 
     s390xlinux: { wrappedNode(label: 's390x-ubuntu-1604') {
         buildAndPush()
-    }}
+    }},
 
     ppc64le: { wrappedNode(label: 'ppc64le-ubuntu-1604') {
         buildAndPush()

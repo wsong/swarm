@@ -589,7 +589,6 @@ func (c *Cluster) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume
 		}
 	}
 
-	err = nil
 	for _, e := range engines {
 		wg.Add(1)
 
@@ -599,9 +598,9 @@ func (c *Cluster) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume
 			v, er := engine.CreateVolume(request)
 			if v != nil {
 				volume = v
+				err = nil
 			}
-			if er != nil {
-				log.Errorf("error when creating volume %s on %s: %s", request.Name, engine.Name, err)
+			if er != nil && volume == nil {
 				err = er
 			}
 		}(e)

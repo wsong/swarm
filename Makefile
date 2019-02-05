@@ -1,18 +1,18 @@
 OS_ARCH:=$(shell docker info --format='{{.OSType}}:{{.Architecture}}')
 
 ifeq "$(OS_ARCH)" "linux:s390x"
-    GOLANG_ALPINE=s390x/golang:1.10.6-alpine3.7
-    ALPINE=s390x/alpine:3.7
+    GOLANG_ALPINE=s390x/golang:1.10.8-alpine3.8
+    ALPINE=s390x/alpine:3.8
     ARCH=s390x
     ARCH_IMG=-s390x
 else ifeq "$(OS_ARCH)" "linux:ppc64le"
-    GOLANG_ALPINE=ppc64le/golang:1.10.6-alpine3.7
-    ALPINE=ppc64le/alpine:3.7
+    GOLANG_ALPINE=ppc64le/golang:1.10.8-alpine3.8
+    ALPINE=ppc64le/alpine:3.8
     ARCH=ppc64le
     ARCH_IMG=-ppc64le
 else ifeq "$(OS_ARCH)" "linux:x86_64"
-    GOLANG_ALPINE=golang:1.10.6-alpine3.7
-    ALPINE=alpine:3.7
+    GOLANG_ALPINE=golang:1.10.8-alpine3.8
+    ALPINE=alpine:3.8
     ARCH=x86_64
     ARCH_IMG=
 else

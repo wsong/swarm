@@ -41,7 +41,7 @@ func TestReplicaBlockedPrimary(t *testing.T) {
 	// create a new replica
 	r := NewReplica(http.NotFoundHandler(), &tls.Config{}, "ouraddr")
 	hijackedprimary := ""
-	// set a fake hijack method. add a sentinal so we can know it's been called
+	// set a fake hijack method. add a sentinel so we can know it's been called
 	r.hijack = func(_ *tls.Config, primary string, _ http.ResponseWriter, _ *http.Request) error {
 		hijackedprimary = primary
 		return nil
@@ -75,7 +75,7 @@ func TestReplicaBlockedPrimary(t *testing.T) {
 	// entered the wait on ServeHTTP
 	for ctx.Checked() == 0 {
 		time.Sleep(100 * time.Millisecond)
-		// yeild the proc so that ServeHTTP has a chance to run
+		// yield the proc so that ServeHTTP has a chance to run
 	}
 	// make sure hijack hasn't been called
 	select {
